@@ -9,9 +9,9 @@ For a correct execution of the scripts, make sure you do not change the file pla
 
 1) Download and unzip this repository
 		      
-2) Download the latest EDB version as a CSV from [https://edb.wto.org/search](https://edb.wto.org/search)
+2) Download the latest EDB *notification* dataset as a CSV from [https://edb.wto.org/search](https://edb.wto.org/search)
 
-3) Place the new file in the folder "EDB raw data"
+3) Replace the CSV file in the directory "EDB raw data" with the new data you just downloaded
 
 4) Open the script "EDB data extraction.R" and run it
 
