@@ -57,7 +57,7 @@ tokenise_description <- function(measures_data,
     measures_keywords$measures_entry_ref<-NULL
     
     # keep only necessary columns to save memory
-    measures_keywords <- measures_keywords[,c("doc_id", "lemma", "upos", "source_var", "measure_nr")]
+    measures_keywords <- measures_keywords[,c("lemma", "upos", "source_var", "measure_nr")]
     
   } else {
     flog.info("No new measure from which to extract keywords")

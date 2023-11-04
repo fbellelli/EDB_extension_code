@@ -75,7 +75,7 @@ match_HS_chapters <- function(measures_data,
     HS_keywords$HS_entry_ref <- as.integer(substr(HS_keywords$doc_id,4,10))
     
     # keep only necessary columns to save memory
-    HS_keywords <- HS_keywords[,c("doc_id", "lemma", "upos", "HS_entry_ref")]
+    HS_keywords <- HS_keywords[,c("lemma", "upos", "HS_entry_ref")]
     
     # cache extracted data for future runs
     fwrite(HS_keywords, file = "cache/HS_keywords.csv")
