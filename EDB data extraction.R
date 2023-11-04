@@ -8,9 +8,8 @@
 #setwd(dirname(rstudioapi::getActiveDocumentContext()$path))  
 
 #load and install required libraries
-memory.limit(64000)
 source("functions/check packages.R")
-check_packages("tidyverse","data.table","stopwords","udpipe","fastmatch","stringdist","Matrix")
+check_packages("countries","tidyverse","data.table","stopwords","udpipe","fastmatch","stringdist","Matrix")
 #__________________________________________________
 
 
