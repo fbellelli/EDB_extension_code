@@ -45,11 +45,13 @@ extract_implementation_years <- function(data){
                  "Other price and market based measures")
   
   #classify measures
-  data$is_subsidy<-NA
-  data$is_regulation<-NA
-  for (i in 1:nrow(data)){
-    data$is_subsidy[i]<-any(subsidies %fin% str_split(data$`Harmonized types of measures`[i],";")[[1]])
-    data$is_regulation[i]<-any(regulations_standards %fin% str_split(data$`Harmonized types of measures`[i],";")[[1]])
+  data$is_subsidy <- FALSE
+  data$is_regulation <- FALSE
+  for (i in subsidies){
+    data$is_subsidy <- data$is_subsidy| data$`Harmonized types of measures` %flike% i
+  }
+  for (i in regulations_standards){
+    data$is_regulation <- data$is_regulation| data$`Harmonized types of measures` %flike% i
   }
   #_______________________________________________________________________________
   

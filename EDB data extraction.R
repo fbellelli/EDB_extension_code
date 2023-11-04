@@ -9,7 +9,7 @@
 
 #load and install required libraries
 source("functions/check packages.R")
-check_packages("countries","tidyverse","data.table","stopwords","udpipe","fastmatch","stringdist","Matrix")
+check_packages("countries", "futile.logger","tidyverse","data.table","stopwords","udpipe","fastmatch","stringdist","Matrix")
 #__________________________________________________
 
 
@@ -45,7 +45,7 @@ data <- extract_countries(data,
 #3) EXTRACT IMPLEMENTATION YEARS ------------------
 
 #the function below creates a column "START" and "END" containing the extracted initial and final (if any is detected) implementation years.
-#[execution time ~30 seconds]
+#[execution time ~20 seconds]
 source("functions/extract implementation years.R")
 data <- extract_implementation_years(data)
 #__________________________________________________
@@ -67,6 +67,7 @@ data <- associate_ISIC(data)
 #[execution time ~15 MINUTES!!]
 source("functions/tokenise descriptions.R")
 measures_keywords <- tokenise_description(measures_data = data,
+                                          cache = TRUE, # Logical indicating wheter to use cached data
                                           udpipe_model_path = "programme files/english-ewt-ud-2.4-190531.udpipe")
 #__________________________________________________
 

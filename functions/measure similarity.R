@@ -102,11 +102,17 @@ measure_similarity <- function(data = data,
   
   # EXPORT RESULTS TO EDB DATA TABLE -----------------------------------------------------
   
-  data <- similarity_table %>% 
-    group_by(i) %>% 
-    summarise(`Similar measures` = paste0(j, collapse=";"),
-              `Similarity index` = paste0(similarity, collapse=";"), .groups="drop") %>%
-    left_join(data, . , by=c("Nr"="i"))
+  temp <- similarity_table[,.(
+    "Similar measures" = paste0(j, collapse=";"),
+    "Similarity index" = paste0(similarity, collapse=";")
+  ), by = "i"]
+  data <- left_join(data, temp , by=c("Nr"="i"))
+  
+  # data <- similarity_table %>% 
+  #   group_by(i) %>% 
+  #   summarise(`Similar measures` = paste0(j, collapse=";"),
+  #             `Similarity index` = paste0(similarity, collapse=";"), .groups="drop") %>%
+  #   left_join(data, . , by=c("Nr"="i"))
   
   return(data)
   #_______________________________________________________________________________________
