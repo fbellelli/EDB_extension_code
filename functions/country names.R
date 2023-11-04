@@ -5,14 +5,15 @@ extract_countries <- function(data,
                               output_name = "WTO_en"){   #select naming convention for output: "WTO_name" (WTO members), "ISO.3" (M49 ISO-3 codes), "M49_code" (M49 codes) 
 
   
+  flog.info("Cleaning country names")
 
   #FUZZY MATCH COUNTRY COLUMN NAME:----------------------------------------------
   
   if(!(country_column %in% colnames(data))){
-    cat(paste("No exact match was found for column:",country_column,"\n"))
+    flog.info(paste("No exact match was found for column:",country_column))
     temp<-stringdist(tolower(country_column),tolower(str_trim(colnames(data))))
     country_column<-colnames(data)[match(min(temp),temp)]
-    cat(paste("The programme will use the closest match found:", country_column))
+    flog.info(paste("The programme will use the closest match found:", country_column))
   }
   #_______________________________________________________________________________
   

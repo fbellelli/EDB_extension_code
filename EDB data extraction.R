@@ -75,7 +75,7 @@ measures_keywords <- tokenise_description(measures_data = data,
 #6) LOOK FOR SIMILAR MEASURES ---------------------
 
 #the following function adds two columns containing a list of similar measures notified by the same country, and a measure of similarity
-#[execution time ~ 5 MINUTES]
+#[execution time ~ 10 MINUTES]
 source("functions/measure similarity.R")
 data <- measure_similarity(data,
                            measures_keywords,

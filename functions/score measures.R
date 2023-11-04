@@ -17,7 +17,7 @@ score_measures <- function(measures_data,
   
   #BREADTH ===========================================================================
   
-  cat("Calculating BREADTH components \n")
+  flog.info("Calculating BREADTH components")
   
   #1)----------------------ECONOMIC SECTORS ------------------------------------------
   
@@ -157,7 +157,7 @@ score_measures <- function(measures_data,
   
   #DEPTH==========================================================================
   
-  cat("Calculating DEPTH components \n")
+  flog.info("Calculating DEPTH components")
   
   #1)----------------------WORDING INTENSITY--------------------------------
   

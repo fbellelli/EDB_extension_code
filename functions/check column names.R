@@ -1,6 +1,7 @@
 
 check_colnames <- function(data){
   
+  flog.info("Checking EDB columns")
   
   essential_columns <- c("Nr",
                          "Notifying Member",

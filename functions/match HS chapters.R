@@ -21,6 +21,7 @@ match_HS_chapters <- function(measures_data,
                               weight_env_obj_yes = 1,  #Step 3 weights (see methodology note) - weight applied to links with consistent environmental objective
                               weight_env_obj_no = 0.9){  
   
+  flog.info("Matching HS codes to measures")
   
   # MAPPING HS-SECTORS (redefine as appropriate) --------------------
   
@@ -54,20 +55,34 @@ match_HS_chapters <- function(measures_data,
   
   #--------------EXTRACT KEYWORDS & ANNOTATE------------------------
   
-  #load language model from udpipe
-  ud_model <- udpipe_load_model(udpipe_model_path)
-  
-  #tokenise and annotate words in HS code description (!this step takes time!)
-  cat("extracting, annotating and cleaning keywords \n")
-  HS_data$Description <- enc2utf8(HS_data$Description)
-  HS_keywords <- udpipe_annotate(ud_model,HS_data$Description)
-  HS_keywords <- as.data.frame(HS_keywords)
-  
-  #create variable with row number of original HS table 
-  HS_keywords <- HS_keywords %>% mutate(HS_entry_ref=as.integer(substr(HS_keywords$doc_id,4,10)))
+  if (file.exists("cache/HS_keywords.csv")){
+    HS_keywords <- read.csv("cache/HS_keywords.csv")
+  } else {
+    
+    #load language model from udpipe
+    ud_model <- udpipe_load_model(udpipe_model_path)
+    
+    #tokenise and annotate words in HS code description (!this step takes time!)
+    flog.info("extracting, annotating and cleaning keywords of HS code descriptions")
+    HS_data$Description <- enc2utf8(HS_data$Description)
+    Encoding(HS_data$Description) <- "UTF-8"
+    HS_data$Description <- iconv(HS_data$Description, "UTF-8", "UTF-8",sub='') 
+    
+    HS_keywords <- udpipe_annotate(ud_model, HS_data$Description)
+    HS_keywords <- as.data.frame(HS_keywords)
+    
+    #create variable with row number of original HS table 
+    HS_keywords$HS_entry_ref <- as.integer(substr(HS_keywords$doc_id,4,10))
+    
+    # keep only necessary columns to save memory
+    HS_keywords <- HS_keywords[,c("doc_id", "lemma", "upos", "HS_entry_ref")]
+    
+    # cache extracted data for future runs
+    fwrite(HS_keywords, file = "cache/HS_keywords.csv")
+  }
   
   #merge data information in keywords table:
-  HS_keywords<-cbind(HS_keywords,HS_data[HS_keywords$HS_entry_ref,])
+  HS_keywords<-cbind(HS_keywords, HS_data[HS_keywords$HS_entry_ref,])
   measures_keywords<- left_join(measures_keywords, measures_data, by=c("measure_nr"="Nr"))
   
   
@@ -91,22 +106,19 @@ match_HS_chapters <- function(measures_data,
   
   #--------------CALCULATE FREQUENCIES AND TD-IDF WEIGHTS OF HS KEYWORDS (omega)------------------------
   
-  #Calculating omega row by row. This step takes some time 
-  tot_chapters<-length(unique(HS_keywords$chapter))
-  for(k in 1:nrow(HS_keywords)){
-    temp_chp<-HS_keywords$chapter[k]
-    temp_key<-HS_keywords$keywords[k]
-    temp_data<-HS_keywords %>% filter(keywords==temp_key)
-    
-    #calculate omega and apply threshold value (J+ in methodology note)
-    if(1+log((1+tot_chapters)/(1+length(unique(temp_data$chapter)))) >= 1+log((1+tot_chapters)/(1+keyword_threshold))){
-      HS_keywords$key_omega[k] <- 1+log((1+min(tot_chapters,keyword_threshold))/(1+length(unique(temp_data$chapter))))
-    } else {
-      HS_keywords$key_omega[k] <- 0
-    }
-  }
-  rm(k,temp_chp,temp_key,temp_data)
+  flog.info("Calculate weights (omega) of keywords")
   
+  # count in how many chapters keywords appear
+  keywords_chp_tally <-as.data.table(HS_keywords)[,.(key_in_n_chapters = length(unique(chapter))), by = "keywords"]
+  HS_keywords  <- left_join(HS_keywords, keywords_chp_tally, by = "keywords")
+  rm(keywords_chp_tally)
+  
+  #Calculating omega  
+  tot_chapters<-length(unique(HS_keywords$chapter))
+  HS_keywords$key_omega <- ifelse(1+log((1+tot_chapters)/(1+HS_keywords$key_in_n_chapters)) >= 1+log((1+tot_chapters)/(1+keyword_threshold)),
+                                  1+log((1+min(tot_chapters, keyword_threshold))/(1+HS_keywords$key_in_n_chapters)),
+                                  0)
+
   #adjust importance of some frequent keywords for specific chapters
   HS_keywords$key_omega <- ifelse((HS_keywords$chapter %in% c(84))&(HS_keywords$lemma %in% c("water","agricultural")),
                                   HS_keywords$key_omega * 0.2, HS_keywords$key_omega)
@@ -128,11 +140,11 @@ match_HS_chapters <- function(measures_data,
                                   HS_keywords$key_omega * 0.5, HS_keywords$key_omega)
   HS_keywords$key_omega <- ifelse((HS_keywords$chapter %in% c(3))&(HS_keywords$lemma %in% c("consumption")),
                                   HS_keywords$key_omega * 0.5, HS_keywords$key_omega)
-
+  
   
   
   #omit HS keywords that fall above the threshold
-  HS_keywords <- HS_keywords %>% filter(key_omega!=0)
+  HS_keywords <- HS_keywords[HS_keywords$key_omega!=0,]
   
   #calculate count, frequency and weighted count for each HS keywords
   HS_keywords <- HS_keywords %>%
@@ -147,7 +159,7 @@ match_HS_chapters <- function(measures_data,
   
   #--------------ESTABLISH KEYWORD MATCHES------------------------
   
-  cat("Linking measures to HS chapters \n")
+  flog.info("Linking measures to HS chapters")
   
   #preparing index for looping over measures
   list_measures<-unique(measures_keywords$measure_nr)
@@ -157,7 +169,7 @@ match_HS_chapters <- function(measures_data,
   
   #establish keyword matches (this step takes long)
   for (measure in list_measures){
-    temp_measures<-measures_keywords %>% filter(measure_nr==measure)
+    temp_measures<-measures_keywords[measures_keywords$measure_nr==measure]
     
     #MEASURES: get the frequency of each unique keyword in the measure description
     temp_freq<-txt_freq(temp_measures$keywords)
@@ -188,11 +200,13 @@ match_HS_chapters <- function(measures_data,
   }
   rm(measure,temp_measures,temp_freq,temp_match_freq, list_measures,temp_match,temp_match_table,tot_chapters,temp_sector,temp_env_obj)
   
-
+  
   #--------------CALCULATE ABSOLUTE LINK STRENGTH------------------------
   
   #reorder match table
-  match_table<-match_table %>% select(measure_nr,harmonised_sector, harmonised_env_objective, chapter,keywords,n_measures,n_HS,freq_measures,freq_HS,omega) %>% arrange(measure_nr,chapter)
+  match_table<-match_table %>% 
+    select(measure_nr,harmonised_sector, harmonised_env_objective, chapter,keywords,n_measures,n_HS,freq_measures,freq_HS,omega) %>%
+    arrange(measure_nr,chapter)
   
   #calculate link strength: L, L-tilde
   link_table<-match_table %>% 
@@ -230,7 +244,7 @@ match_HS_chapters <- function(measures_data,
   #-------------CHECK HS/ICS CODES REPORTED BY MEMBERS---------------------
   
   
-  cat("Checking and converting HS/ICS codes reported by Members")
+  flog.info("Checking and converting HS/ICS codes reported by Members")
   
   #import ICS and HS into the link table 
   working_data<-left_join(link_table,measures_data[,c("Nr","ICS - HS code")], by= c("measure_nr"="Nr")) 
@@ -273,6 +287,7 @@ match_HS_chapters <- function(measures_data,
     working_data$possible_chp[working_data$`ICS - HS code`==converted_table$check_ICS[i]]<-converted_table$possible_chp[i]
   }
   rm(i, check_ICS)
+  fc()
   
   #evaluate the possible matches for ambiguous codes
   check_ambiguous<-unique(working_data$`ICS - HS code`[working_data$is_ambiguous==TRUE])
@@ -315,14 +330,14 @@ match_HS_chapters <- function(measures_data,
   
   #update the list of possible chapters with HS codes
   working_data<-working_data %>% ungroup() %>% mutate(reported_HS_chp = ifelse(is_HS==TRUE,ifelse(grepl("^(\\d)(\\d\\d)?\\..*$",`ICS - HS code`,perl = TRUE),str_replace(`ICS - HS code`,"^(\\d)(\\d\\d)?\\..*$","\\1"),
-                                                                                                                ifelse(grepl("^(\\d)(\\d\\d)$",`ICS - HS code`,perl = TRUE),str_replace(`ICS - HS code`,"^(\\d)\\d\\d$","\\1"),
-                                                                                                                       ifelse(grepl("^(\\d\\d).*$",`ICS - HS code`,perl = TRUE),str_replace(`ICS - HS code`,"^(\\d\\d).*$","\\1"),NA))),
-                                                                                             NA))
+                                                                                                  ifelse(grepl("^(\\d)(\\d\\d)$",`ICS - HS code`,perl = TRUE),str_replace(`ICS - HS code`,"^(\\d)\\d\\d$","\\1"),
+                                                                                                         ifelse(grepl("^(\\d\\d).*$",`ICS - HS code`,perl = TRUE),str_replace(`ICS - HS code`,"^(\\d\\d).*$","\\1"),NA))),
+                                                                               NA))
   working_data$reported_HS_chp<-suppressWarnings(as.numeric(formatC(as.numeric(working_data$reported_HS_chp), width = 2, flag= "0")))
   working_data<-working_data %>% mutate(possible_chp = ifelse(is_HS==TRUE,reported_HS_chp,possible_chp),
-                                                      reported_HS = ifelse(is_HS==TRUE,`ICS - HS code`,NA),
-                                                      reported_ICS = ifelse(is_ICS==TRUE, `ICS - HS code`,NA),
-                                                      reported_ambiguous = ifelse(is_ambiguous == TRUE, `ICS - HS code`, NA))                                                                   
+                                        reported_HS = ifelse(is_HS==TRUE,`ICS - HS code`,NA),
+                                        reported_ICS = ifelse(is_ICS==TRUE, `ICS - HS code`,NA),
+                                        reported_ambiguous = ifelse(is_ambiguous == TRUE, `ICS - HS code`, NA))                                                                   
   
   #allow any chapter for measures with no reported HS/ICS code
   working_data$possible_chp[is.na(working_data$possible_chp)] <- paste0(formatC(1:99, width = 2, flag= "0"),collapse=";") 
@@ -345,10 +360,10 @@ match_HS_chapters <- function(measures_data,
               `Reported ICS codes` = paste0(na.exclude(reported_ICS),collapse = ";"),
               `Reported ambiguous codes` = paste0(na.exclude(reported_ambiguous),collapse = ";"), .groups = "drop")
   
-
+  
   #--------------APPLY CUT-OFF VALUES------------------------
   
-  cat("Reducing number of links \n")
+  flog.info("Reducing number of links by applying cut-offs")
   
   #calculate relative link strength (L-bar)
   temp <- final_table %>% group_by(measure_nr) %>% summarise(tot_L_tilde = sum(L_tilde), .groups="drop")
@@ -366,12 +381,12 @@ match_HS_chapters <- function(measures_data,
   #round linkage scores
   final_table$L_tilde <- round(final_table$L_tilde, 0)
   final_table$L_bar <- round(final_table$L_bar, 3)
-
+  
   #rename columns
   final_table <- final_table %>% rename("Tentative HS chapters match" = "chapter",
                                         "Absolute link strength (L_tilde)" = "L_tilde",
                                         "Relative link strength (L_bar)" = "L_bar")
   
-
+  
   return(list(HS_matches = final_table, info_reported_codes = info_reported_codes))
 }

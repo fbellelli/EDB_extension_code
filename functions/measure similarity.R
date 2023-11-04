@@ -6,6 +6,8 @@ measure_similarity <- function(data = data,
   
   #COMPUTE SIMILARITY MATRIX ----------------------------------------------------------------
   
+  flog.info("Computing similarity index between measures")
+  
   #create tables with unique index for the measures and keywords (these will correspond to the measure-keyword matrix indices)
   table_id_measures <- data.frame(measure_nr=unique(measures_keywords$measure_nr))
   table_id_measures$id_measure <- 1:nrow(table_id_measures)
@@ -34,10 +36,12 @@ measure_similarity <- function(data = data,
   tot_matrix <- expand.grid(diag(freq_matrix),diag(freq_matrix))
   tot_matrix <- matrix(tot_matrix[,1] + tot_matrix[,2], nrow(table_id_measures), nrow(table_id_measures))
   tot_matrix <- tot_matrix - freq_matrix
+  gc()
   
   #get similarity index:
   similarity_matrix <- as.matrix(freq_matrix / tot_matrix)
   rm(freq_matrix,tot_matrix) #free-up memory
+  gc()
   #_______________________________________________________________________________________
   
   
@@ -74,7 +78,9 @@ measure_similarity <- function(data = data,
     #import info from similarity matrix
     similarity_table$similarity <- similarity_matrix[as.matrix(similarity_table[,c("id_measure_i","id_measure_j")])] 
     
-    rm(measure_countries, similarity_matrix) #free-up memory
+    #free-up memory
+    rm(measure_countries, similarity_matrix) 
+    gc()
     
   } else {
     #create a list of measure indices
@@ -85,18 +91,20 @@ measure_similarity <- function(data = data,
     
     #free-up memory
     rm(similarity_matrix)
+    gc()
     
     #import original measure Nr
     colnames(table_id_measures) <- c("i","id_measure_i")
     similarity_table <- left_join(similarity_table, table_id_measures, by="id_measure_i")
     colnames(table_id_measures) <- c("j","id_measure_j")
-    similarity_table <- left_join(similarity_table, table_id_measures, by="id_measure_j")  
-    
+    similarity_table <- left_join(similarity_table, table_id_measures, by="id_measure_j") 
+    gc()
   }
   
   # FILTER WITH CUT-OFF VALUE
-  similarity_table <- similarity_table[similarity_table$similarity > cut_off, c("i","j","similarity")]
-  similarity_table$similarity <- round(similarity_table$similarity, 3)
+  similarity_table <- as.data.table(similarity_table)[similarity_table$similarity > cut_off, c("i","j","similarity"), with = F]
+  similarity_table[, similarity := round(similarity, 3)]
+
   #_______________________________________________________________________________________
   
   
@@ -107,13 +115,7 @@ measure_similarity <- function(data = data,
     "Similarity index" = paste0(similarity, collapse=";")
   ), by = "i"]
   data <- left_join(data, temp , by=c("Nr"="i"))
-  
-  # data <- similarity_table %>% 
-  #   group_by(i) %>% 
-  #   summarise(`Similar measures` = paste0(j, collapse=";"),
-  #             `Similarity index` = paste0(similarity, collapse=";"), .groups="drop") %>%
-  #   left_join(data, . , by=c("Nr"="i"))
-  
+
   return(data)
   #_______________________________________________________________________________________
   

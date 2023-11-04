@@ -3,6 +3,8 @@
 
 extract_implementation_years <- function(data){
   
+  flog.info("extracting implementation years")
+  
   #EXECUTION INFO:------------------------------------------------------
   
   original_number_of_columns <- ncol(data)

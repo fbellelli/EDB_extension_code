@@ -4,6 +4,8 @@ tokenise_description <- function(measures_data,
                                  cache = TRUE, # Logical indicating wheter to use cached data
                                  udpipe_model_path = "programme files/english-ewt-ud-2.4-190531.udpipe"){ #path to the ML model
   
+  flog.info("Tokenising measure descriptions")
+  
   if (cache & file.exists("cache/measures_keywords.csv")){
     
     # loading cached data
@@ -31,11 +33,11 @@ tokenise_description <- function(measures_data,
     measures_data$`Measure description` <- enc2utf8(  measures_data$`Measure description`)
     
     #tokenise and annotate words in description (!this step takes long!)
-    cat("extracting and annotating keywords from - Coverage of the measure \n")
+    flog.info("Extracting and annotating keywords from - Coverage of the measure")
     measures_keywords1 <- udpipe_annotate(ud_model,measures_data$`Coverage of the measure`) #words in coverage of the measure
-    cat("extracting and annotating keywords from - Environment-related objectives \n")
+    flog.info("Extracting and annotating keywords from - Environment-related objectives \n")
     measures_keywords2 <- udpipe_annotate(ud_model,measures_data$`Environment-related objective`) #words in environment-related objective
-    cat("extracting and annotating keywords from - Measure description \n")
+    flog.info("Extracting and annotating keywords from - Measure description \n")
     measures_keywords3 <- udpipe_annotate(ud_model,measures_data$`Measure description`)#words in keyword description
     
     #add a column providing info on source of text
@@ -58,6 +60,7 @@ tokenise_description <- function(measures_data,
     measures_keywords <- measures_keywords[,c("doc_id", "lemma", "upos", "source_var", "measure_nr")]
     
   } else {
+    flog.info("No new measure from which to extract keywords")
     measures_keywords <- NULL
   }
   
