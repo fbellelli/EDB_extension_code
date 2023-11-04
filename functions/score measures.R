@@ -94,28 +94,23 @@ score_measures <- function(measures_data,
   share_sector_final[,2:ncol(share_sector_final)] <- sapply(share_sector_final[,2:ncol(share_sector_final)], function(x) as.numeric(ifelse(is.na(x),mean(x,na.rm=TRUE),x)))
   
   
-  #FIND THE COUNTRY NAME CORRESPONDING TO EACH ENTRY IN THE EDB
-  list_countries<-unique(working_data$COUNTRIES)
-  dest_countries<-unique(sector_data$Countries)
-  working_data$match_countries<-as.character(NA)
-  for (i in 1:length(list_countries)){
-    temp<- list_countries[i]
-    working_data$match_countries[working_data$COUNTRIES==temp]<-dest_countries[which.min(stringdist(tolower(list_countries[i]),tolower(dest_countries)))][1]
-  }
-  rm(i,list_countries, dest_countries, temp)
+  # remove characters that are not UTF8
+  Encoding(share_sector_final$Countries) <- "UTF-8"
+  share_sector_final$Countries <- iconv(share_sector_final$Countries, "UTF-8", "UTF-8",sub='') 
+  share_sector_final$WTO_name <- country_name(share_sector_final$Countries, to = "WTO_en")
   
   #CALCULATE INDEX AFFECTED SECTORS:
   working_data <- working_data %>% rowwise() %>% mutate(BREADTH_economic_sectors=log(1+ifelse(grepl("All products/economic activities",`Harmonized types of sectors subject to the measure`,ignore.case=TRUE),
                                                                                               100,
-                                                                                              share_sector_final$agriculture[match(match_countries,share_sector_final$Countries)]*as.integer(grepl("Agriculture",`Harmonized types of sectors subject to the measure`,ignore.case=TRUE))+
-                                                                                                share_sector_final$chemicals[match(match_countries,share_sector_final$Countries)]*as.integer(grepl("Chemicals",`Harmonized types of sectors subject to the measure`,ignore.case=TRUE))+
-                                                                                                share_sector_final$energy[match(match_countries,share_sector_final$Countries)]*as.integer(grepl("Energy",`Harmonized types of sectors subject to the measure`,ignore.case=TRUE))+
-                                                                                                share_sector_final$forestry[match(match_countries,share_sector_final$Countries)]*as.integer(grepl("Forestry",`Harmonized types of sectors subject to the measure`,ignore.case=TRUE))+
-                                                                                                share_sector_final$fishing[match(match_countries,share_sector_final$Countries)]*as.integer(grepl("Fisheries",`Harmonized types of sectors subject to the measure`,ignore.case=TRUE))+
-                                                                                                share_sector_final$manufacturing[match(match_countries,share_sector_final$Countries)]*as.integer(grepl("Manufacturing",`Harmonized types of sectors subject to the measure`,ignore.case=TRUE))+
-                                                                                                share_sector_final$mining[match(match_countries,share_sector_final$Countries)]*as.integer(grepl("Mining",`Harmonized types of sectors subject to the measure`,ignore.case=TRUE))+
-                                                                                                share_sector_final$services[match(match_countries,share_sector_final$Countries)]*as.integer(grepl("Services",`Harmonized types of sectors subject to the measure`,ignore.case=TRUE))+
-                                                                                                share_sector_final$other[match(match_countries,share_sector_final$Countries)]*as.integer(grepl("Other",`Harmonized types of sectors subject to the measure`,ignore.case=TRUE))+
+                                                                                              share_sector_final$agriculture[match(COUNTRIES,share_sector_final$WTO_name)]*as.integer(grepl("Agriculture",`Harmonized types of sectors subject to the measure`,ignore.case=TRUE))+
+                                                                                                share_sector_final$chemicals[match(COUNTRIES,share_sector_final$WTO_name)]*as.integer(grepl("Chemicals",`Harmonized types of sectors subject to the measure`,ignore.case=TRUE))+
+                                                                                                share_sector_final$energy[match(COUNTRIES,share_sector_final$WTO_name)]*as.integer(grepl("Energy",`Harmonized types of sectors subject to the measure`,ignore.case=TRUE))+
+                                                                                                share_sector_final$forestry[match(COUNTRIES,share_sector_final$WTO_name)]*as.integer(grepl("Forestry",`Harmonized types of sectors subject to the measure`,ignore.case=TRUE))+
+                                                                                                share_sector_final$fishing[match(COUNTRIES,share_sector_final$WTO_name)]*as.integer(grepl("Fisheries",`Harmonized types of sectors subject to the measure`,ignore.case=TRUE))+
+                                                                                                share_sector_final$manufacturing[match(COUNTRIES,share_sector_final$WTO_name)]*as.integer(grepl("Manufacturing",`Harmonized types of sectors subject to the measure`,ignore.case=TRUE))+
+                                                                                                share_sector_final$mining[match(COUNTRIES,share_sector_final$WTO_name)]*as.integer(grepl("Mining",`Harmonized types of sectors subject to the measure`,ignore.case=TRUE))+
+                                                                                                share_sector_final$services[match(COUNTRIES,share_sector_final$WTO_name)]*as.integer(grepl("Services",`Harmonized types of sectors subject to the measure`,ignore.case=TRUE))+
+                                                                                                share_sector_final$other[match(COUNTRIES,share_sector_final$WTO_name)]*as.integer(grepl("Other",`Harmonized types of sectors subject to the measure`,ignore.case=TRUE))+
                                                                                                 0*as.integer(grepl("Not specified",`Harmonized types of sectors subject to the measure`,ignore.case=TRUE))
   ))/log(101))
   
@@ -205,43 +200,6 @@ score_measures <- function(measures_data,
   
   
   #3)----------------------POLICY TOOLS--------------------------------
-  #IDENTIFY MEASURES CONTAINING SUBSIDIES / STANDARD AND REGULATIONS or BOTH
-  regulations_standards<-c("Technical regulation or specifications",
-                           "Conformity assessment procedures",
-                           "Import licences",
-                           "Ban/Prohibition",
-                           "Export licences",
-                           "Risk assessment",
-                           "Countervailing measure / investigation",
-                           "Regulation affecting movement or transit",
-                           "Environmental provisions in trade agreements",
-                           "Other environmental requirements",
-                           "Import quotas",
-                           "Intellectual property measures",
-                           "Quarantine requirements",
-                           "Safeguard measure / investigation",
-                           "Export quotas",
-                           "Investment measures",
-                           "Anti-dumping measure / investigation",
-                           "Services requirements",
-                           "Internal taxes",
-                           "Export tariffs") 
-  subsidies<-  c("Grants and direct payments",
-                 "Non-monetary support",
-                 "Tax concessions",
-                 "Loans and financing",
-                 "Public procurement",
-                 "Other support measures",
-                 "Income or price support",
-                 "Import tariffs",
-                 "Other price and market based measures")
-  
-  measures_data$measure_tool_subsidy<-NA
-  measures_data$measure_tool_sandard_regulation<-NA
-  for (i in 1:nrow(measures_data)){
-    measures_data$measure_tool_subsidy[i]<-any(subsidies %fin% str_split(measures_data$`Harmonized types of measures`[i],";")[[1]])
-    measures_data$measure_tool_sandard_regulation[i]<-any(regulations_standards %fin% str_split(measures_data$`Harmonized types of measures`[i],";")[[1]])
-  }
   
   #score based on ranking of type of harmonised measures.
   tools_group1<-c("Ban/Prohibition","Internal taxes","Grants and direct payments","Income or price support")
@@ -249,19 +207,21 @@ score_measures <- function(measures_data,
   tools_group3<-c("Export licences","Import licences","Technical regulation or specifications","Conformity assessment procedures","Regulation affecting movement or transit","Environmental provisions in trade agreements","Other environmental requirements","Quarantine requirements","Services requirements","Other support measures")
   tools_group4<-c("Investment measures","Intellectual property measures","Risk assessment","Countervailing measure / investigation","Safeguard measure / investigation","Anti-dumping measure / investigation","Other measures")  
   tools_group5<-c("Not specified")
+  group_weights <- c(1, 0.75, 0.5, 0.25, 0)
   
   #calculate component score
-  measures_data$DEPTH_measures_instrument <- as.numeric()
-  for (i in 1:nrow(measures_data)){
-    temp<-str_split(measures_data$`Harmonized types of measures`[i],";")
-    measures_data$DEPTH_measures_instrument[i]<-ifelse(any(tools_group1 %fin% temp[[1]]),1,
-                                                       ifelse(any(tools_group2 %fin% temp[[1]]),0.75,
-                                                              ifelse(any(tools_group3 %fin% temp[[1]]),0.5,
-                                                                     ifelse(any(tools_group4 %fin% temp[[1]]),0.25,
-                                                                            ifelse(any(tools_group5 %fin% temp[[1]]),0,NA)))))
+  measures_data$DEPTH_measures_instrument <- 0
+  for(i in 1:5){
+    tools <- get(paste0("tools_group",i))
+    weight <- group_weights[i]
+    for (tool in tools){
+      measures_data$DEPTH_measures_instrument <- ifelse(measures_data$DEPTH_measures_instrument < weight & measures_data$`Harmonized types of measures` %flike% tool,
+                                                        weight,
+                                                        measures_data$DEPTH_measures_instrument)
+      
+    }
   }
-  measures_data$measure_tool_subsidy <- NULL
-  measures_data$measure_tool_sandard_regulation <- NULL
+
   
   
   #---------------------- FINAL DEPTH SCORE ------------------------------------------
